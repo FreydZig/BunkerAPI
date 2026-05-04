@@ -8,8 +8,9 @@ public sealed class GameSessionService(ICardService cardService) : IGameSessionS
 {
     private const int MaxPlayerNameLength = 64;
     private const int MaxPlayersPerSession = 24;
+    private const int MaxCodeGenerationAttempts = 256;
 
-    private readonly ConcurrentDictionary<Guid, GameSession> _sessions = new();
+    private readonly ConcurrentDictionary<string, GameSession> _sessions = new(StringComparer.Ordinal);
 
     public bool TryCreateSession(CreateSessionRequest? request, out CreateSessionResponse? response, out string? error)
     {
@@ -23,35 +24,42 @@ public sealed class GameSessionService(ICardService cardService) : IGameSessionS
             return false;
         }
 
-        var sessionId = Guid.NewGuid();
         var hostId = Guid.NewGuid();
 
-        var session = new GameSession
+        for (var attempt = 0; attempt < MaxCodeGenerationAttempts; attempt++)
         {
-            Id = sessionId,
-            CreatedAt = DateTimeOffset.UtcNow,
-            Phase = GamePhase.Lobby,
-            HostPlayerId = hostId,
-        };
-        session.Players.Add(new GamePlayer { Id = hostId, Name = hostName });
+            var code = SessionCode.GenerateNew();
+            var session = new GameSession
+            {
+                SessionCode = code,
+                CreatedAt = DateTimeOffset.UtcNow,
+                Phase = GamePhase.Lobby,
+                HostPlayerId = hostId,
+            };
+            session.Players.Add(new GamePlayer { Id = hostId, Name = hostName });
 
-        _sessions[sessionId] = session;
+            if (_sessions.TryAdd(code, session))
+            {
+                response = new CreateSessionResponse
+                {
+                    SessionId = code,
+                    PlayerId = hostId,
+                    HostPlayerId = hostId,
+                };
+                return true;
+            }
+        }
 
-        response = new CreateSessionResponse
-        {
-            SessionId = sessionId,
-            PlayerId = hostId,
-            HostPlayerId = hostId,
-        };
-        return true;
+        error = "Не удалось выделить код комнаты, попробуйте ещё раз.";
+        return false;
     }
 
-    public bool TryJoinSession(Guid sessionId, JoinSessionRequest request, out JoinSessionResponse? response, out SessionJoinFailure failure)
+    public bool TryJoinSession(string sessionCode, JoinSessionRequest request, out JoinSessionResponse? response, out SessionJoinFailure failure)
     {
         response = null;
         failure = SessionJoinFailure.None;
 
-        if (!_sessions.TryGetValue(sessionId, out var session))
+        if (!_sessions.TryGetValue(sessionCode, out var session))
         {
             failure = SessionJoinFailure.SessionNotFound;
             return false;
@@ -91,11 +99,11 @@ public sealed class GameSessionService(ICardService cardService) : IGameSessionS
         }
     }
 
-    public bool TryStartGame(Guid sessionId, Guid actorPlayerId, out string? error)
+    public bool TryStartGame(string sessionCode, Guid actorPlayerId, out string? error)
     {
         error = null;
 
-        if (!_sessions.TryGetValue(sessionId, out var session))
+        if (!_sessions.TryGetValue(sessionCode, out var session))
         {
             error = "Сессия не найдена.";
             return false;
@@ -123,9 +131,9 @@ public sealed class GameSessionService(ICardService cardService) : IGameSessionS
         }
     }
 
-    public SessionViewDto? GetSessionView(Guid sessionId, Guid? viewerPlayerId)
+    public SessionViewDto? GetSessionView(string sessionCode, Guid? viewerPlayerId)
     {
-        if (!_sessions.TryGetValue(sessionId, out var session))
+        if (!_sessions.TryGetValue(sessionCode, out var session))
             return null;
 
         lock (session)
@@ -149,7 +157,7 @@ public sealed class GameSessionService(ICardService cardService) : IGameSessionS
 
             return new SessionViewDto
             {
-                SessionId = session.Id,
+                SessionId = session.SessionCode,
                 Phase = session.Phase,
                 CreatedAt = session.CreatedAt,
                 HostPlayerId = session.HostPlayerId,
