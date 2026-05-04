@@ -1,0 +1,10 @@
+# Blueprint: подключите репозиторий BunkerAPI в Render → New → Blueprint.
+# После деплоя скопируйте URL сервиса (https://…onrender.com) в VITE_API_BASE_URL фронта.
+services:
+  - type: web
+    name: bunker-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /Hello
