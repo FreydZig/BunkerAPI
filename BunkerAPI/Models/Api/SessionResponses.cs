@@ -4,7 +4,7 @@ namespace BunkerAPI.Models.Api;
 
 public sealed class CreateSessionResponse
 {
-    public required Guid SessionId { get; init; }
+    public required string SessionId { get; init; }
     public required Guid PlayerId { get; init; }
     public required Guid HostPlayerId { get; init; }
 }
@@ -23,7 +23,7 @@ public sealed class PlayerViewDto
 
 public sealed class SessionViewDto
 {
-    public required Guid SessionId { get; init; }
+    public required string SessionId { get; init; }
     public required GamePhase Phase { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public required Guid HostPlayerId { get; init; }
