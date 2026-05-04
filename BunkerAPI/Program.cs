@@ -4,6 +4,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddSingleton<ICardService, CardService>();
+builder.Services.AddSingleton<IGameSessionService, GameSessionService>();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
