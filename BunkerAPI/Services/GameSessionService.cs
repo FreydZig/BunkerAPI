@@ -11,11 +11,20 @@ public sealed class GameSessionService(ICardService cardService) : IGameSessionS
 
     private readonly ConcurrentDictionary<Guid, GameSession> _sessions = new();
 
-    public CreateSessionResponse CreateSession(CreateSessionRequest? request)
+    public bool TryCreateSession(CreateSessionRequest? request, out CreateSessionResponse? response, out string? error)
     {
+        response = null;
+        error = null;
+
+        var hostName = NormalizeName(request?.HostName, defaultIfEmpty: null);
+        if (hostName is null)
+        {
+            error = "Укажите непустое имя хоста.";
+            return false;
+        }
+
         var sessionId = Guid.NewGuid();
         var hostId = Guid.NewGuid();
-        var hostName = NormalizeName(request?.HostName, defaultIfEmpty: "Хост") ?? "Хост";
 
         var session = new GameSession
         {
@@ -28,12 +37,13 @@ public sealed class GameSessionService(ICardService cardService) : IGameSessionS
 
         _sessions[sessionId] = session;
 
-        return new CreateSessionResponse
+        response = new CreateSessionResponse
         {
             SessionId = sessionId,
             PlayerId = hostId,
             HostPlayerId = hostId,
         };
+        return true;
     }
 
     public bool TryJoinSession(Guid sessionId, JoinSessionRequest request, out JoinSessionResponse? response, out SessionJoinFailure failure)

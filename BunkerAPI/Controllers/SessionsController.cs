@@ -12,9 +12,12 @@ public class SessionsController(IGameSessionService sessions) : ControllerBase
 
     [HttpPost]
     [ProducesResponseType(typeof(CreateSessionResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<CreateSessionResponse> CreateSession([FromBody] CreateSessionRequest? request)
     {
-        var created = sessions.CreateSession(request);
+        if (!sessions.TryCreateSession(request, out var created, out var error) || created is null)
+            return BadRequest(error);
+
         return CreatedAtAction(nameof(GetSession), new { sessionId = created.SessionId }, created);
     }
 
